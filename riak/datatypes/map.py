@@ -278,7 +278,7 @@ class Map(Mapping, Datatype):
 
     def _extract_updates(self, d):
         for key in d:
-            if d[key].modified:
+            if d[key].modified and d[key].to_op() is not None:
                 yield ('update', key, d[key].to_op())
 
 

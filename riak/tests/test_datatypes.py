@@ -127,6 +127,9 @@ class MapUnitTests(DatatypeUnitTests,
         dtype.registers['b'].assign('testing')
         dtype.flags['c'].enable()
         dtype.maps['d'][('e', 'set')].add('deep value')
+        dtype.maps['f'].counters['g']
+        dtype.maps['h'].maps['i'].flags['j']
+
 
     def check_op_output(self, op):
         self.assertIn(('update', ('a', 'counter'), ('increment', 2)), op)
@@ -135,6 +138,9 @@ class MapUnitTests(DatatypeUnitTests,
         self.assertIn(('update', ('d', 'map'), [('update', ('e', 'set'),
                                                  {'adds': ['deep value']})]),
                       op)
+        self.assertNotIn(('update', ('f', 'map'), None), op)
+        self.assertNotIn(('update', ('h', 'map'), [('update', ('i', 'map'),
+                                                    None)]), op)
 
     def test_removes_require_context(self):
         dtype = self.dtype(self.bucket, 'key')
