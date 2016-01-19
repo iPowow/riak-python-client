@@ -1,21 +1,37 @@
 # -*- coding: utf-8 -*-
-
 from __future__ import print_function
+
+import platform
+
 from six import PY2
 from riak.mapreduce import RiakMapReduce
 from riak import key_filter, RiakError
+from riak.tests import RUN_YZ
+from riak.tests.base import IntegrationTestBase
 from riak.tests.test_yokozuna import wait_for_yz_index
 from riak.tests import RUN_SECURITY
-import platform
+from riak.tests.yz_setup import yzSetUp, yzTearDown
+
 if platform.python_version() < '2.7':
     unittest = __import__('unittest2')
 else:
     import unittest
 
-from . import RUN_YZ
+
+testrun_yz_mr = {'btype': 'pytest-mr',
+                 'bucket': 'mrbucket',
+                 'index': 'mrbucket'}
 
 
-class LinkTests(object):
+def setUpModule():
+    yzSetUp(testrun_yz_mr)
+
+
+def tearDownModule():
+    yzTearDown(testrun_yz_mr)
+
+
+class LinkTests(IntegrationTestBase, unittest.TestCase):
     def test_store_and_get_links(self):
         # Create the object...
         bucket = self.client.bucket(self.bucket_name)
@@ -81,7 +97,7 @@ class LinkTests(object):
         self.assertEqual(len(results), 1)
 
 
-class ErlangMapReduceTests(object):
+class ErlangMapReduceTests(IntegrationTestBase, unittest.TestCase):
     def test_erlang_map_reduce(self):
         # Create the object...
         bucket = self.client.bucket(self.bucket_name)
@@ -187,7 +203,8 @@ class ErlangMapReduceTests(object):
             mr.add_key_filter("tokenize", "-", 1)
 
 
-class JSMapReduceTests(object):
+class JSMapReduceTests(IntegrationTestBase, unittest.TestCase):
+
     def test_javascript_source_map(self):
         # Create the object...
         bucket = self.client.bucket(self.bucket_name)
@@ -503,13 +520,13 @@ class JSMapReduceTests(object):
                           u'"fooval2"',
                           u'"fooval3"'])
 
-    @unittest.skipUnless(RUN_YZ, 'RUN_YZ is undefined')
+    @unittest.skipUnless(RUN_YZ, 'RUN_YZ is 0')
     def test_mr_search(self):
         """
         Try a successful map/reduce from search results.
         """
-        btype = self.client.bucket_type(self.yz_mr['btype'])
-        bucket = btype.bucket(self.yz_mr['bucket'])
+        btype = self.client.bucket_type(testrun_yz_mr['btype'])
+        bucket = btype.bucket(testrun_yz_mr['bucket'])
         bucket.new("Pebbles", {"name_s": "Fruity Pebbles",
                                "maker_s": "Post",
                                "sugar_i": 9,
@@ -537,7 +554,7 @@ class JSMapReduceTests(object):
                               "fruit_b": False}).store()
         # Wait for Solr to catch up
         wait_for_yz_index(bucket, "Crunch")
-        mr = RiakMapReduce(self.client).search(self.yz_mr['bucket'],
+        mr = RiakMapReduce(self.client).search(testrun_yz_mr['bucket'],
                                                'fruit_b:false')
         mr.map("""function(v) {
             var solr_doc = JSON.parse(v.values[0].data);
@@ -547,7 +564,7 @@ class JSMapReduceTests(object):
         self.assertEqual(result, [100])
 
 
-class MapReduceAliasTests(object):
+class MapReduceAliasTests(IntegrationTestBase, unittest.TestCase):
     """This tests the map reduce aliases"""
 
     def test_map_values(self):
@@ -742,7 +759,7 @@ class MapReduceAliasTests(object):
         self.assertEqual(sorted(result), [1, 2])
 
 
-class MapReduceStreamTests(object):
+class MapReduceStreamTests(IntegrationTestBase, unittest.TestCase):
     def test_stream_results(self):
         bucket = self.client.bucket(self.bucket_name)
         bucket.new('one', data=1).store()

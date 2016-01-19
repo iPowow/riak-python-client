@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import platform
 from riak.mapreduce import RiakKeyFilter
 from riak import key_filter

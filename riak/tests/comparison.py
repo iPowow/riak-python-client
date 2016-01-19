@@ -1,20 +1,4 @@
-"""
-Copyright 2014 Basho Technologies, Inc.
-
-This file is provided to you under the Apache License,
-Version 2.0 (the "License"); you may not use this file
-except in compliance with the License.  You may obtain
-a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-"""
+# -*- coding: utf-8 -*-
 from six import PY2, PY3
 import collections
 import warnings
@@ -129,8 +113,8 @@ class Comparison(object):
                 diffMsg = '\n'.join(lines)
                 standardMsg = self._truncateMessage(standardMsg, diffMsg)
 
-    def assert_raises_regex(self, exception, regexp, msg=None):
+    def assert_raises_regex(self, exception, regexp):
         if PY2:
-            return self.assertRaisesRegexp(exception, regexp, msg)
+            return self.assertRaisesRegexp(exception, regexp)
         else:
-            return self.assertRaisesRegex(exception, regexp, msg)
+            return self.assertRaisesRegex(exception, regexp)

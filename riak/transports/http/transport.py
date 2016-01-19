@@ -1,5 +1,5 @@
 """
-Copyright 2012 Basho Technologies, Inc.
+Copyright 2015 Basho Technologies, Inc.
 Copyright 2010 Rusty Klophaus <rusty@basho.com>
 Copyright 2010 Justin Sheehy <justin@basho.com>
 Copyright 2009 Jay Baird <jay@mochimedia.com>
@@ -25,10 +25,6 @@ except ImportError:
     import json
 
 from six import PY2
-if PY2:
-    from httplib import HTTPConnection
-else:
-    from http.client import HTTPConnection
 from xml.dom.minidom import Document
 from riak.transports.transport import RiakTransport
 from riak.transports.http.resources import RiakHttpResources
@@ -42,6 +38,10 @@ from riak.transports.http.stream import (
 from riak import RiakError
 from riak.security import SecurityError
 from riak.util import decode_index_value, bytes_to_str, str_to_long
+if PY2:
+    from httplib import HTTPConnection
+else:
+    from http.client import HTTPConnection
 
 
 class RiakHttpTransport(RiakHttpConnection, RiakHttpResources, RiakHttpCodec,
@@ -55,7 +55,7 @@ class RiakHttpTransport(RiakHttpConnection, RiakHttpResources, RiakHttpCodec,
                  client=None,
                  connection_class=HTTPConnection,
                  client_id=None,
-                 **unused_options):
+                 **options):
         """
         Construct a new HTTP connection to Riak.
         """
@@ -65,6 +65,7 @@ class RiakHttpTransport(RiakHttpConnection, RiakHttpResources, RiakHttpCodec,
         self._node = node
         self._connection_class = connection_class
         self._client_id = client_id
+        self._options = options
         if not self._client_id:
             self._client_id = self.make_random_client_id()
         self._connect()
@@ -188,8 +189,8 @@ class RiakHttpTransport(RiakHttpConnection, RiakHttpResources, RiakHttpCodec,
 
         url = self.object_path(robj.bucket.name, robj.key,
                                bucket_type=bucket_type, **params)
-        use_vclocks = (self.tombstone_vclocks() and hasattr(robj, 'vclock')
-                       and robj.vclock is not None)
+        use_vclocks = (self.tombstone_vclocks() and hasattr(robj, 'vclock') and
+                       robj.vclock is not None)
         if use_vclocks:
             headers['X-Riak-Vclock'] = robj.vclock.encode('base64')
         response = self._request('DELETE', url, headers)
@@ -444,7 +445,8 @@ class RiakHttpTransport(RiakHttpConnection, RiakHttpResources, RiakHttpCodec,
         else:
             raise RiakError('Error streaming secondary index.')
 
-    def create_search_index(self, index, schema=None, n_val=None):
+    def create_search_index(self, index, schema=None, n_val=None,
+                            timeout=None):
         """
         Create a Solr search index for Yokozuna.
 
@@ -454,6 +456,8 @@ class RiakHttpTransport(RiakHttpConnection, RiakHttpResources, RiakHttpCodec,
         :type schema: string
         :param n_val: N value of the write
         :type n_val: int
+        :param timeout: optional timeout (in ms)
+        :type timeout: integer, None
 
         :rtype boolean
         """
@@ -468,6 +472,8 @@ class RiakHttpTransport(RiakHttpConnection, RiakHttpResources, RiakHttpCodec,
             content_dict['schema'] = schema
         if n_val:
             content_dict['n_val'] = n_val
+        if timeout:
+            content_dict['timeout'] = timeout
         content = json.dumps(content_dict)
 
         # Run the request...
@@ -774,6 +780,26 @@ class RiakHttpTransport(RiakHttpConnection, RiakHttpResources, RiakHttpCodec,
                                                       response['value']))
 
         return True
+
+    def get_preflist(self, bucket, key):
+        """
+        Get the preflist for a bucket/key
+
+        :param bucket: Riak Bucket
+        :type bucket: :class:`~riak.bucket.RiakBucket`
+        :param key: Riak Key
+        :type key: string
+        :rtype: list of dicts
+        """
+        bucket_type = self._get_bucket_type(bucket.bucket_type)
+        url = self.preflist_path(bucket.name, key, bucket_type=bucket_type)
+        status, headers, body = self._request('GET', url)
+
+        if status == 200:
+            preflist = json.loads(bytes_to_str(body))
+            return preflist['preflist']
+        else:
+            raise RiakError('Error getting bucket/key preflist.')
 
     def check_http_code(self, status, expected_statuses):
         if status not in expected_statuses:

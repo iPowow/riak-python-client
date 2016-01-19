@@ -1,5 +1,5 @@
 """
-Copyright 2012 Basho Technologies, Inc.
+Copyright 2015 Basho Technologies, Inc.
 
 This file is provided to you under the Apache License,
 Version 2.0 (the "License"); you may not use this file
@@ -18,12 +18,12 @@ under the License.
 
 import re
 from six import PY2
+from riak import RiakError
+from riak.util import lazy_property, bytes_to_str
 if PY2:
     from urllib import quote_plus, urlencode
 else:
     from urllib.parse import quote_plus, urlencode
-from riak import RiakError
-from riak.util import lazy_property, bytes_to_str
 
 
 class RiakHttpResources(object):
@@ -172,6 +172,30 @@ class RiakHttpResources(object):
         return mkpath("/types", quote_plus(bucket_type), "buckets",
                       quote_plus(bucket), "datatypes", key, **options)
 
+    def preflist_path(self, bucket, key, bucket_type=None, **options):
+        """
+        Generate the URL for bucket/key preflist information
+
+        :param bucket: Name of a Riak bucket
+        :type bucket: string
+        :param key: Name of a Key
+        :type key: string
+        :param bucket_type: Optional Riak Bucket Type
+        :type bucket_type: None or string
+        :rtype URL string
+        """
+        if not self.riak_kv_wm_preflist:
+            raise RiakError("Preflists are unsupported by this Riak node")
+        if self.riak_kv_wm_bucket_type and bucket_type:
+            return mkpath("/types", quote_plus(bucket_type),
+                          "buckets", quote_plus(bucket),
+                          "keys", quote_plus(key),
+                          "preflist", **options)
+        else:
+            return mkpath("/buckets", quote_plus(bucket),
+                          "keys", quote_plus(key),
+                          "preflist", **options)
+
     # Feature detection overrides
     def bucket_types(self):
         return self.riak_kv_wm_bucket_type is not None
@@ -226,6 +250,10 @@ class RiakHttpResources(object):
         return self.resources.get('riak_kv_wm_counter')
 
     @lazy_property
+    def riak_kv_wm_preflist(self):
+        return self.resources.get('riak_kv_wm_preflist')
+
+    @lazy_property
     def yz_wm_search(self):
         return self.resources.get('yz_wm_search')
 
@@ -264,7 +292,7 @@ def mkpath(*segments, **query):
         if query[key] in [False, True]:
             _query[key] = str(query[key]).lower()
         elif query[key] is not None:
-            if PY2 and isinstance(query[key], unicode):
+            if PY2 and isinstance(query[key], unicode):  # noqa
                 _query[key] = query[key].encode('utf-8')
             else:
                 _query[key] = query[key]

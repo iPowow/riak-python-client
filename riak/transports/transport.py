@@ -92,6 +92,42 @@ class RiakTransport(FeatureDetection):
         """
         raise NotImplementedError
 
+    def ts_describe(self, table):
+        """
+        Retrieves a timeseries table description.
+        """
+        raise NotImplementedError
+
+    def ts_get(self, table, key):
+        """
+        Retrieves a timeseries object.
+        """
+        raise NotImplementedError
+
+    def ts_put(self, tsobj):
+        """
+        Stores a timeseries object.
+        """
+        raise NotImplementedError
+
+    def ts_delete(self, table, key):
+        """
+        Deletes a timeseries object.
+        """
+        raise NotImplementedError
+
+    def ts_query(self, table, query, interpolations=None):
+        """
+        Query timeseries data.
+        """
+        raise NotImplementedError
+
+    def ts_stream_keys(self, table, timeout=None):
+        """
+        Streams the list of keys for the table through an iterator.
+        """
+        raise NotImplementedError
+
     def get_buckets(self, bucket_type=None, timeout=None):
         """
         Gets the list of buckets as strings.
@@ -172,7 +208,8 @@ class RiakTransport(FeatureDetection):
         """
         raise NotImplementedError
 
-    def create_search_index(self, index, schema=None, n_val=None):
+    def create_search_index(self, index, schema=None, n_val=None,
+                            timeout=None):
         """
         Creates a yokozuna search index.
         """
@@ -267,6 +304,12 @@ class RiakTransport(FeatureDetection):
                         return_body=None, timeout=None, include_context=None):
         """
         Updates a Riak Datatype by sending local operations to the server.
+        """
+        raise NotImplementedError
+
+    def get_preflist(self, bucket, key):
+        """
+        Fetches the preflist for a bucket/key.
         """
         raise NotImplementedError
 

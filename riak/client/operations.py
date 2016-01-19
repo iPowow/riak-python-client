@@ -1,26 +1,9 @@
-"""
-Copyright 2012 Basho Technologies, Inc.
-
-This file is provided to you under the Apache License,
-Version 2.0 (the "License"); you may not use this file
-except in compliance with the License.  You may obtain
-a copy of the License at
-
-http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-"""
-
 from riak.client.transport import RiakClientTransport, \
     retryable, retryableHttpOnly
 from riak.client.multiget import multiget
 from riak.client.index_page import IndexPage
 from riak.datatypes import TYPES
+from riak.table import Table
 from riak.util import bytes_to_str
 from six import string_types, PY2
 
@@ -58,11 +41,11 @@ class RiakClientOperations(RiakClientTransport):
         """
         _validate_timeout(timeout)
         if bucket_type:
-            bucketfn = lambda name: bucket_type.bucket(name)
+            bucketfn = self._bucket_type_bucket_builder
         else:
-            bucketfn = lambda name: self.bucket(name)
+            bucketfn = self._default_type_bucket_builder
 
-        return [bucketfn(bytes_to_str(name)) for name in
+        return [bucketfn(bytes_to_str(name), bucket_type) for name in
                 transport.get_buckets(bucket_type=bucket_type,
                                       timeout=timeout)]
 
@@ -103,9 +86,9 @@ class RiakClientOperations(RiakClientTransport):
         """
         _validate_timeout(timeout)
         if bucket_type:
-            bucketfn = lambda name: bucket_type.bucket(name)
+            bucketfn = self._bucket_type_bucket_builder
         else:
-            bucketfn = lambda name: self.bucket(name)
+            bucketfn = self._default_type_bucket_builder
 
         resource = self._acquire()
         transport = resource.object
@@ -114,7 +97,7 @@ class RiakClientOperations(RiakClientTransport):
         stream.attach(resource)
         try:
             for bucket_list in stream:
-                bucket_list = [bucketfn(bytes_to_str(name))
+                bucket_list = [bucketfn(bytes_to_str(name), bucket_type)
                                for name in bucket_list]
                 if len(bucket_list) > 0:
                     yield bucket_list
@@ -554,6 +537,146 @@ class RiakClientOperations(RiakClientTransport):
                              timeout=timeout)
 
     @retryable
+    def ts_describe(self, transport, table):
+        """
+        ts_describe(table)
+
+        Retrieve a time series table description from the Riak cluster.
+
+        .. note:: This request is automatically retried :attr:`retries`
+           times if it fails due to network error.
+
+        :param table: The timeseries table.
+        :type table: string or :class:`Table <riak.table.Table>`
+        :rtype: :class:`TsObject <riak.ts_object.TsObject>`
+        """
+        t = table
+        if isinstance(t, string_types):
+            t = Table(self, table)
+        return transport.ts_describe(t)
+
+    @retryable
+    def ts_get(self, transport, table, key):
+        """
+        ts_get(table, key)
+
+        Retrieve timeseries value by key
+
+        .. note:: This request is automatically retried :attr:`retries`
+           times if it fails due to network error.
+
+        :param table: The timeseries table.
+        :type table: string or :class:`Table <riak.table.Table>`
+        :param key: The timeseries value's key.
+        :type key: list
+        :rtype: :class:`TsObject <riak.ts_object.TsObject>`
+        """
+        t = table
+        if isinstance(t, string_types):
+            t = Table(self, table)
+        return transport.ts_get(t, key)
+
+    @retryable
+    def ts_put(self, transport, tsobj):
+        """
+        ts_put(tsobj)
+
+        Stores time series data in the Riak cluster.
+
+        .. note:: This request is automatically retried :attr:`retries`
+           times if it fails due to network error.
+
+        :param tsobj: the time series object to store
+        :type tsobj: RiakTsObject
+        :rtype: boolean
+        """
+        return transport.ts_put(tsobj)
+
+    @retryable
+    def ts_delete(self, transport, table, key):
+        """
+        ts_delete(table, key)
+
+        Delete timeseries value by key
+
+        .. note:: This request is automatically retried :attr:`retries`
+           times if it fails due to network error.
+
+        :param table: The timeseries table.
+        :type table: string or :class:`Table <riak.table.Table>`
+        :param key: The timeseries value's key.
+        :type key: list or dict
+        :rtype: boolean
+        """
+        t = table
+        if isinstance(t, string_types):
+            t = Table(self, table)
+        return transport.ts_delete(t, key)
+
+    @retryable
+    def ts_query(self, transport, table, query, interpolations=None):
+        """
+        ts_query(table, query, interpolations=None)
+
+        Queries time series data in the Riak cluster.
+
+        .. note:: This request is automatically retried :attr:`retries`
+           times if it fails due to network error.
+
+        :param table: The timeseries table.
+        :type table: string or :class:`Table <riak.table.Table>`
+        :param query: The timeseries query.
+        :type query: string
+        :rtype: :class:`TsObject <riak.ts_object.TsObject>`
+        """
+        t = table
+        if isinstance(t, string_types):
+            t = Table(self, table)
+        return transport.ts_query(t, query, interpolations)
+
+    def ts_stream_keys(self, table, timeout=None):
+        """
+        Lists all keys in a time series table via a stream. This is a
+        generator method which should be iterated over.
+
+        The caller should explicitly close the returned iterator,
+        either using :func:`contextlib.closing` or calling ``close()``
+        explicitly. Consuming the entire iterator will also close the
+        stream. If it does not, the associated connection might
+        not be returned to the pool. Example::
+
+            from contextlib import closing
+
+            # Using contextlib.closing
+            with closing(client.ts_stream_keys(mytable)) as keys:
+                for key_list in keys:
+                    do_something(key_list)
+
+            # Explicit close()
+            stream = client.ts_stream_keys(mytable)
+            for key_list in stream:
+                 do_something(key_list)
+            stream.close()
+
+        :param table: the table from which to stream keys
+        :type table: Table
+        :param timeout: a timeout value in milliseconds
+        :type timeout: int
+        :rtype: iterator
+        """
+        _validate_timeout(timeout)
+        resource = self._acquire()
+        transport = resource.object
+        stream = transport.ts_stream_keys(table, timeout)
+        stream.attach(resource)
+        try:
+            for keylist in stream:
+                if len(keylist) > 0:
+                    yield keylist
+        finally:
+            stream.close()
+
+    @retryable
     def get(self, transport, robj, r=None, pr=None, timeout=None,
             basic_quorum=None, notfound_ok=None):
         """
@@ -685,7 +808,8 @@ class RiakClientOperations(RiakClientTransport):
             stream.close()
 
     @retryable
-    def create_search_index(self, transport, index, schema=None, n_val=None):
+    def create_search_index(self, transport, index, schema=None, n_val=None,
+                            timeout=None):
         """
         create_search_index(index, schema=None, n_val=None)
 
@@ -698,8 +822,10 @@ class RiakClientOperations(RiakClientTransport):
         :type schema: string, None
         :param n_val: this indexes N value
         :type n_val: integer, None
+        :param timeout: optional timeout (in ms)
+        :type timeout: integer, None
         """
-        return transport.create_search_index(index, schema, n_val)
+        return transport.create_search_index(index, schema, n_val, timeout)
 
     @retryable
     def get_search_index(self, transport, index):
@@ -914,7 +1040,7 @@ class RiakClientOperations(RiakClientTransport):
         :type returnvalue: bool
         """
         if PY2:
-            valid_types = (int, long)
+            valid_types = (int, long)  # noqa
         else:
             valid_types = (int,)
         if type(value) not in valid_types:
@@ -1001,6 +1127,44 @@ class RiakClientOperations(RiakClientTransport):
                                              include_context=include_context)
 
     @retryable
+    def get_preflist(self, transport, bucket, key):
+        """
+        Fetch the preflist for a given bucket and key.
+
+        .. note:: This request is automatically retried :attr:`retries`
+           times if it fails due to network error.
+
+        :param bucket: the bucket whose index will be queried
+        :type bucket: RiakBucket
+        :param key: the key of the preflist
+        :type key: string
+
+        :return: list of dicts (partition, node, primary)
+        """
+        return transport.get_preflist(bucket, key)
+
+    def _bucket_type_bucket_builder(self, name, bucket_type):
+        """
+        Build a bucket from a bucket type
+
+        :param name: Bucket name
+        :param bucket_type: A bucket type
+        :return: A bucket object
+        """
+        return bucket_type.bucket(name)
+
+    def _default_type_bucket_builder(self, name, unused):
+        """
+        Build a bucket for the default bucket type
+
+        :param name: Default bucket name
+        :param unused: Unused
+        :return: A bucket object
+        """
+        del unused  # Ignored parameters.
+        return self.bucket(name)
+
+    @retryable
     def _fetch_datatype(self, transport, bucket, key, r=None, pr=None,
                         basic_quorum=None, notfound_ok=None,
                         timeout=None, include_context=None):
@@ -1052,6 +1216,6 @@ def _validate_timeout(timeout):
     Raises an exception if the given timeout is an invalid value.
     """
     if not (timeout is None or
-            ((type(timeout) == int or (PY2 and type(timeout) == long))
-             and timeout > 0)):
+            ((type(timeout) == int or
+             (PY2 and type(timeout) == long)) and timeout > 0)):  # noqa
         raise ValueError("timeout must be a positive integer")

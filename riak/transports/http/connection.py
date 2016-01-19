@@ -1,5 +1,5 @@
 """
-Copyright 2012 Basho Technologies, Inc.
+Copyright 2015 Basho Technologies, Inc.
 
 This file is provided to you under the Apache License,
 Version 2.0 (the "License"); you may not use this file
@@ -17,12 +17,12 @@ under the License.
 """
 
 from six import PY2
+import base64
+from riak.util import str_to_bytes
 if PY2:
     from httplib import NotConnected, HTTPConnection
 else:
     from http.client import NotConnected, HTTPConnection
-import base64
-from riak.util import str_to_bytes
 
 
 class RiakHttpConnection(object):
@@ -65,14 +65,21 @@ class RiakHttpConnection(object):
         """
         Use the appropriate connection class; optionally with security.
         """
+        timeout = None
+        if self._options is not None and 'timeout' in self._options:
+            timeout = self._options['timeout']
+
         if self._client._credentials:
-            self._connection = \
-                self._connection_class(self._node.host,
-                                       self._node.http_port,
-                                       self._client._credentials)
+            self._connection = self._connection_class(
+                host=self._node.host,
+                port=self._node.http_port,
+                credentials=self._client._credentials,
+                timeout=timeout)
         else:
-            self._connection = self._connection_class(self._node.host,
-                                                      self._node.http_port)
+            self._connection = self._connection_class(
+                    host=self._node.host,
+                    port=self._node.http_port,
+                    timeout=timeout)
         # Forces the population of stats and resources before any
         # other requests are made.
         self.server_version
