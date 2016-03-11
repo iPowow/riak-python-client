@@ -3,9 +3,7 @@
 import platform
 from setuptools import setup, find_packages
 from version import get_version
-from commands import preconfigure, configure, create_bucket_types, \
-    setup_security, enable_security, disable_security, setup_timeseries, \
-    build_messages
+from commands import setup_timeseries, build_messages
 
 install_requires = ['six >= 1.8.0']
 requires = ['six(>=1.8.0)']
@@ -20,10 +18,15 @@ else:
     install_requires.append('python3_protobuf >=2.4.1, <2.6.0')
     requires.append('python3_protobuf(>=2.4.1, <2.6.0)')
 
-
 tests_require = []
 if platform.python_version() < '2.7.0':
     tests_require.append("unittest2")
+
+try:
+    import pypandoc
+    long_description = pypandoc.convert('README.md', 'rst')
+except(IOError, ImportError):
+    long_description = open('README.md').read()
 
 setup(
     name='riak',
@@ -34,6 +37,7 @@ setup(
     tests_require=tests_require,
     package_data={'riak': ['erl_src/*']},
     description='Python client for Riak',
+    long_description=long_description,
     zip_safe=True,
     options={'easy_install': {'allow_hosts': 'pypi.python.org'}},
     include_package_data=True,
@@ -45,13 +49,7 @@ setup(
     url='https://github.com/basho/riak-python-client',
     cmdclass={
         'build_messages': build_messages,
-        'setup_timeseries': setup_timeseries,
-        'create_bucket_types': create_bucket_types,
-        'setup_security': setup_security,
-        'preconfigure': preconfigure,
-        'configure': configure,
-        'enable_security': enable_security,
-        'disable_security': disable_security
+        'setup_timeseries': setup_timeseries
     },
     classifiers=['License :: OSI Approved :: Apache Software License',
                  'Intended Audience :: Developers',
